@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Ep9PYujHjWLfhfdoqz3P+ER8lNLJTJmaAgbmCqaQ8Ag='; style-src 'sha256-eyRWRnsL43oZuLYaa2dKmFenxyjwEKRCVIpHk3T41Q0='; img-src data:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="format-detection" content="telephone=no">
+<title>NEXORA · Firmador CEO</title>
+<style>
+:root { --bg: #f6f7f9; --fg: #111418; --card: #ffffff; --muted: #5b6470; --line: #d5dae1;
+  --accent: #0b5fff; --ok: #0a7d32; --bad: #c0261b; --warn: #a15c00; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0e1116; --fg: #e8ebef; --card: #171b22; --muted: #9aa4b1; --line: #2c333d;
+    --accent: #5b9bff; --ok: #4cc675; --bad: #ff6b5e; --warn: #ffb347; }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 18px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+main { max-width: 640px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 1.5em; margin: 8px 0 4px; }
+h2 { font-size: 1.2em; margin: 0 0 12px; }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 16px 0; }
+p { margin: 8px 0; }
+.lead, .note { color: var(--muted); font-size: 0.92em; }
+label { display: block; font-weight: 600; margin: 14px 0 6px; }
+input, textarea, button { font: inherit; width: 100%; border-radius: 10px; }
+input, textarea { padding: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+textarea, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15px; word-break: break-all; }
+button { min-height: 52px; margin-top: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+  font-weight: 600; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: 0.45; }
+fieldset { border: 1px solid var(--line); border-radius: 10px; margin: 14px 0 0; padding: 8px 12px; }
+legend { font-weight: 600; padding: 0 6px; }
+fieldset label { display: flex; align-items: center; gap: 12px; font-weight: 500; margin: 6px 0; min-height: 44px; }
+fieldset input { width: 26px; height: 26px; margin: 0; }
+table { width: 100%; border-collapse: collapse; font-size: 0.92em; }
+th, td { text-align: left; vertical-align: top; padding: 8px 4px; border-bottom: 1px solid var(--line); }
+th { width: 34%; color: var(--muted); font-weight: 600; }
+td { word-break: break-all; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.state { font-weight: 700; }
+.state.on { color: var(--ok); }
+.state.off { color: var(--bad); }
+.msg { min-height: 1.4em; font-weight: 600; }
+.msg.ok { color: var(--ok); }
+.msg.bad { color: var(--bad); }
+.msg.warn { color: var(--warn); }
+.big { font-size: 1.05em; padding: 12px; border: 2px solid var(--accent); border-radius: 10px; background: var(--bg); }
+input.totp { font-size: 2em; letter-spacing: 0.4em; text-align: center; font-family: ui-monospace, Menlo, monospace; }
+a.button { display: block; text-align: center; text-decoration: none; min-height: 52px; line-height: 52px; margin-top: 12px;
+  border-radius: 10px; font-weight: 600; background: var(--accent); color: #fff; }
+a.button.alt { background: var(--bg); color: var(--fg); border: 1px solid var(--line); }
+.code { font: 700 1.6em/1.3 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.12em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Firmador CEO · NEXORA</h1>
+  <p class="lead">Página estática (copia de GitHub Pages de <code>tools/ceo_signer/ceo_signer.html</code>): una vez
+    cargada no hace ninguna petición de red. El reto llega en el fragmento <code>#ch=</code> del QR o del botón
+    «Firmar» de Telegram, que el navegador no envía a ningún servidor. La llave privada Ed25519 nunca sale de este teléfono:
+    solo vive cifrada en tu Llavero de iCloud y, desbloqueada, en la memoria de esta página.</p>
+
+  <section>
+    <h2>Estado de la llave</h2>
+    <p>Llave: <span id="key-state" class="state off">BLOQUEADA</span></p>
+    <p class="mono" id="key-id-view"></p>
+    <button id="btn-lock" type="button" hidden>Bloquear (borrar la llave de la memoria)</button>
+  </section>
+
+  <section>
+    <h2>1. Desbloquear la llave</h2>
+    <form id="form-unlock" autocomplete="on">
+      <label for="unlock-blob">Llave cifrada (NXKEY1…)</label>
+      <input id="unlock-blob" name="username" autocomplete="username" autocapitalize="off" autocorrect="off"
+        spellcheck="false" required>
+      <label for="unlock-pass">Frase de paso</label>
+      <input id="unlock-pass" name="password" type="password" autocomplete="current-password" required>
+      <button type="submit" class="primary">Desbloquear</button>
+    </form>
+    <p class="note">Toca el campo de la llave y elige la entrada guardada del Llavero (Face ID).</p>
+    <p id="unlock-msg" class="msg" role="status"></p>
+  </section>
+
+  <section>
+    <h2>2. Firmar una decisión</h2>
+    <label for="ch-input">Reto recibido (NXCH1…)</label>
+    <textarea id="ch-input" rows="3" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+    <button id="btn-inspect" type="button">Inspeccionar reto</button>
+    <div id="ch-view" hidden>
+      <p>Código de comprobación: <span id="ch-code" class="code"></span></p>
+      <p class="note">Debe coincidir con el de la Cabina o el aviso de Telegram. Comprueba cada campo antes de firmar.</p>
+      <table><tbody id="ch-table"></tbody></table>
+      <p id="ch-expiry" class="msg"></p>
+      <fieldset>
+        <legend>Decisión</legend>
+        <label><input type="radio" name="decision" value="APPROVE" checked> APROBAR</label>
+        <label><input type="radio" name="decision" value="VETO"> VETAR (importe 0.00)</label>
+      </fieldset>
+      <label for="amount">Importe en USD (0.00 a 100.00)</label>
+      <input id="amount" inputmode="decimal" autocomplete="off" value="0.00">
+      <label for="totp">Código TOTP de 6 dígitos (va dentro del comando de Telegram)</label>
+      <input id="totp" class="totp" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
+      <button id="btn-sign" type="button" class="primary">Firmar</button>
+    </div>
+    <p id="sign-msg" class="msg" role="status"></p>
+    <div id="sign-out" hidden>
+      <div id="tg-wrap">
+        <label for="out-tg">Comando para Telegram</label>
+        <textarea id="out-tg" rows="5" readonly></textarea>
+        <a id="tg-open" class="button" href="#" rel="noreferrer">Responder en Telegram (1 toque)</a>
+        <a id="tg-pick" class="button alt" href="#" rel="noreferrer" hidden>Elegir chat</a>
+        <button id="copy-tg" type="button">Copiar comando de Telegram</button>
+      </div>
+      <p id="tg-none" class="note" hidden>Esta acción no se aprueba por Telegram: pega el token NXSIG3 en la Cabina.</p>
+      <label for="out-sig">Token NXSIG3 (para la Cabina)</label>
+      <textarea id="out-sig" rows="5" readonly></textarea>
+      <button id="copy-sig" type="button">Copiar token NXSIG3</button>
+      <p id="copy-msg" class="msg" role="status"></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>3. Generar llave nueva (solo una vez)</h2>
+    <p class="note">Se crea una llave Ed25519 en este teléfono y se cifra con tu frase de paso (PBKDF2-SHA256,
+      600&nbsp;000 iteraciones). Guarda la llave cifrada NXKEY1 en el Llavero. Para el alta en NEXORA envía
+      <strong>SOLO</strong> <code>public_key_hex</code> y <code>key_id</code>; nunca la llave cifrada ni la frase.</p>
+    <form id="form-new" autocomplete="on">
+      <label for="new-pass">Frase de paso nueva (mínimo 12 caracteres)</label>
+      <input id="new-pass" name="password" type="password" autocomplete="new-password" minlength="12">
+      <label for="new-pass2">Repite la frase de paso</label>
+      <input id="new-pass2" name="password2" type="password" autocomplete="new-password" minlength="12">
+      <button id="btn-generate" type="button">Generar llave nueva</button>
+      <label for="new-blob">Llave cifrada (se guarda como «usuario» en el Llavero)</label>
+      <input id="new-blob" name="username" autocomplete="username" autocapitalize="off" autocorrect="off"
+        spellcheck="false">
+      <button id="btn-save" type="submit" class="primary" disabled>Guardar en el Llavero</button>
+    </form>
+    <p id="new-msg" class="msg" role="status"></p>
+    <div id="new-out" hidden>
+      <label for="new-enrol">public_key_hex y key_id (lo ÚNICO que se envía para el alta)</label>
+      <textarea id="new-enrol" class="big" rows="4" readonly></textarea>
+      <button id="copy-pub" type="button">Copiar public_key_hex + key_id</button>
+      <label for="new-blob-copy">Copia de seguridad de la llave cifrada (NO la envíes a nadie)</label>
+      <textarea id="new-blob-copy" rows="4" readonly></textarea>
+      <button id="copy-blob" type="button">Copiar llave cifrada</button>
+      <p id="new-copy-msg" class="msg" role="status"></p>
+    </div>
+  </section>
+</main>
+<script>
+"use strict";
+/*
+ * NEXORA CEO phone signer (payload v3, D-C15 / D-C27 / T-03).
+ * Everything below NXCORE is pure computation with NO DOM, NO network and NO storage access, so the exact same
+ * code is executed by tests/host/test_ceo_signer_js_vectors.py under node and cross-checked with Python.
+ * Primitives: SHA-256 / SHA-512 (FIPS 180-4), HMAC-SHA256 (RFC 2104), PBKDF2-HMAC-SHA256 (RFC 8018),
+ * Ed25519 pure (RFC 8032, BigInt). BigInt arithmetic is not constant-time: acceptable for a single-user phone
+ * page with no remote attacker able to time it; the seed never leaves memory.
+ */
+const NXCORE = (() => {
+  // ------------------------------------------------------------------ bytes, hex, UTF-8, base64url
+  const utf8 = (s) => new TextEncoder().encode(s);
+  const utf8Decode = (b) => new TextDecoder("utf-8", { fatal: true }).decode(b);
+  const asBytes = (x) => {
+    if (typeof x === "string") return utf8(x);
+    if (x instanceof Uint8Array) return x;
+    throw new TypeError("se esperaban bytes (Uint8Array) o texto");
+  };
+  function concat(...parts) {
+    const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    let off = 0;
+    for (const p of parts) { out.set(p, off); off += p.length; }
+    return out;
+  }
+  const HEX = "0123456789abcdef";
+  function toHex(b) {
+    let s = "";
+    for (const x of b) s += HEX[x >> 4] + HEX[x & 15];
+    return s;
+  }
+  function fromHex(h) {
+    if (typeof h !== "string" || !/^(?:[0-9a-f]{2})*$/.test(h)) throw new Error("hexadecimal inválido");
+    const out = new Uint8Array(h.length / 2);
+    for (let i = 0; i < out.length; i++) out[i] = parseInt(h.slice(2 * i, 2 * i + 2), 16);
+    return out;
+  }
+  const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  function b64urlEncode(b) {  // RFC 4648 §5, no padding
+    let s = "";
+    for (let i = 0; i < b.length; i += 3) {
+      const n = (b[i] << 16) | ((b[i + 1] ?? 0) << 8) | (b[i + 2] ?? 0);
+      const chars = [n >> 18, n >> 12, n >> 6, n].map((v) => B64[v & 63]);
+      s += chars.slice(0, Math.min(4, b.length - i + 1)).join("");
+    }
+    return s;
+  }
+  function b64urlDecode(s) {  // strict: url alphabet only, no padding, zero trailing bits
+    if (typeof s !== "string" || !/^[A-Za-z0-9_-]*$/.test(s) || s.length % 4 === 1) throw new Error("base64url inválido");
+    const out = [];
+    let buf = 0, bits = 0;
+    for (const c of s) {
+      buf = (buf << 6) | B64.indexOf(c);
+      bits += 6;
+      if (bits >= 8) { bits -= 8; out.push((buf >> bits) & 255); }
+      buf &= (1 << bits) - 1;
+    }
+    if (buf !== 0) throw new Error("base64url inválido");
+    return Uint8Array.from(out);
+  }
+  function randomBytes(n) {
+    const c = globalThis.crypto;
+    if (!c || typeof c.getRandomValues !== "function") throw new Error("este navegador no ofrece crypto.getRandomValues");
+    return c.getRandomValues(new Uint8Array(n));
+  }
+
+  // ------------------------------------------------------------------ FIPS 180-4 constants, derived (auditable)
+  // K / IV = leading fractional bits of cube / square roots of the first primes, computed with exact BigInt roots.
+  function iroot(n, k) {  // floor(n^(1/k)) by Newton iteration from an overestimate
+    if (n < 2n) return n;
+    let x = 1n << (BigInt(n.toString(2).length) / k + 1n);
+    for (;;) {
+      const y = ((k - 1n) * x + n / x ** (k - 1n)) / k;
+      if (y >= x) return x;
+      x = y;
+    }
+  }
+  const PRIMES = [];
+  for (let n = 2; PRIMES.length < 80; n++) if (PRIMES.every((p) => n % p !== 0)) PRIMES.push(n);
+  const frac = (p, k, bits) => iroot(BigInt(p) << (k * bits), k) & ((1n << bits) - 1n);
+  const K256 = Int32Array.from(PRIMES.slice(0, 64), (p) => Number(frac(p, 3n, 32n)) | 0);
+  const IV256 = Int32Array.from(PRIMES.slice(0, 8), (p) => Number(frac(p, 2n, 32n)) | 0);
+  const K512 = PRIMES.map((p) => frac(p, 3n, 64n));
+  const IV512 = PRIMES.slice(0, 8).map((p) => frac(p, 2n, 64n));
+
+  // ------------------------------------------------------------------ SHA-256
+  // compress256(st, w, out): one 64-byte block; w[0..15] = big-endian message words (w[16..63] is scratch).
+  function compress256(st, w, out) {
+    for (let i = 16; i < 64; i++) {
+      const x = w[i - 15], y = w[i - 2];
+      const s0 = ((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3);
+      const s1 = ((y >>> 17) | (y << 15)) ^ ((y >>> 19) | (y << 13)) ^ (y >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+    }
+    let a = st[0], b = st[1], c = st[2], d = st[3], e = st[4], f = st[5], g = st[6], h = st[7];
+    for (let i = 0; i < 64; i++) {
+      const S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
+      const t1 = (h + S1 + ((e & f) ^ (~e & g)) + K256[i] + w[i]) | 0;
+      const S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
+      const t2 = (S0 + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    out[0] = (st[0] + a) | 0; out[1] = (st[1] + b) | 0; out[2] = (st[2] + c) | 0; out[3] = (st[3] + d) | 0;
+    out[4] = (st[4] + e) | 0; out[5] = (st[5] + f) | 0; out[6] = (st[6] + g) | 0; out[7] = (st[7] + h) | 0;
+  }
+  function wordsToBytes(words) {
+    const out = new Uint8Array(words.length * 4);
+    const dv = new DataView(out.buffer);
+    words.forEach((v, i) => dv.setInt32(4 * i, v));
+    return out;
+  }
+  function sha256(msg) {
+    msg = asBytes(msg);
+    const len = msg.length, buf = new Uint8Array((((len + 9) + 63) >> 6) << 6);
+    buf.set(msg);
+    buf[len] = 0x80;
+    const dv = new DataView(buf.buffer);
+    dv.setUint32(buf.length - 8, Math.floor((len * 8) / 2 ** 32));
+    dv.setUint32(buf.length - 4, (len * 8) >>> 0);
+    const st = IV256.slice(), w = new Int32Array(64);
+    for (let off = 0; off < buf.length; off += 64) {
+      for (let i = 0; i < 16; i++) w[i] = dv.getInt32(off + 4 * i);
+      compress256(st, w, st);
+    }
+    return wordsToBytes(st);
+  }
+
+  // ------------------------------------------------------------------ SHA-512 (BigInt words; only used by Ed25519)
+  const M64 = (1n << 64n) - 1n;
+  const rotr64 = (x, n) => ((x >> n) | (x << (64n - n))) & M64;
+  function sha512(msg) {
+    msg = asBytes(msg);
+    const len = msg.length, buf = new Uint8Array((((len + 17) + 127) >> 7) << 7);
+    buf.set(msg);
+    buf[len] = 0x80;
+    const dv = new DataView(buf.buffer);
+    dv.setUint32(buf.length - 8, Math.floor((len * 8) / 2 ** 32));
+    dv.setUint32(buf.length - 4, (len * 8) >>> 0);
+    const H = IV512.slice(), w = new Array(80);
+    for (let off = 0; off < buf.length; off += 128) {
+      for (let i = 0; i < 16; i++) w[i] = dv.getBigUint64(off + 8 * i);
+      for (let i = 16; i < 80; i++) {
+        const s0 = rotr64(w[i - 15], 1n) ^ rotr64(w[i - 15], 8n) ^ (w[i - 15] >> 7n);
+        const s1 = rotr64(w[i - 2], 19n) ^ rotr64(w[i - 2], 61n) ^ (w[i - 2] >> 6n);
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) & M64;
+      }
+      let [a, b, c, d, e, f, g, h] = H;
+      for (let i = 0; i < 80; i++) {
+        const S1 = rotr64(e, 14n) ^ rotr64(e, 18n) ^ rotr64(e, 41n);
+        const t1 = (h + S1 + ((e & f) ^ ((e ^ M64) & g)) + K512[i] + w[i]) & M64;
+        const S0 = rotr64(a, 28n) ^ rotr64(a, 34n) ^ rotr64(a, 39n);
+        const t2 = (S0 + ((a & b) ^ (a & c) ^ (b & c))) & M64;
+        h = g; g = f; f = e; e = (d + t1) & M64; d = c; c = b; b = a; a = (t1 + t2) & M64;
+      }
+      [a, b, c, d, e, f, g, h].forEach((v, i) => { H[i] = (H[i] + v) & M64; });
+    }
+    const out = new Uint8Array(64), odv = new DataView(out.buffer);
+    H.forEach((v, i) => odv.setBigUint64(8 * i, v));
+    return out;
+  }
+
+  // ------------------------------------------------------------------ HMAC-SHA256 and PBKDF2-HMAC-SHA256
+  function hmacPads(key) {
+    key = asBytes(key);
+    if (key.length > 64) key = sha256(key);
+    const k = new Uint8Array(64);
+    k.set(key);
+    return [k.map((x) => x ^ 0x36), k.map((x) => x ^ 0x5c)];
+  }
+  function hmacSha256(key, msg) {
+    const [ipad, opad] = hmacPads(key);
+    return sha256(concat(opad, sha256(concat(ipad, asBytes(msg)))));
+  }
+  // Single-block PBKDF2 (dkLen = 32). The HMAC inner/outer states after the key pad block are computed once, so
+  // each iteration costs exactly two SHA-256 compressions on Int32 words (600 000 iterations ~ 1-3 s on a phone).
+  function pbkdf2Sha256(password, salt, iterations) {
+    if (!Number.isInteger(iterations) || iterations < 1) throw new Error("iteraciones inválidas");
+    const [ipad, opad] = hmacPads(password);
+    const padState = (pad) => {
+      const w = new Int32Array(64), dv = new DataView(pad.buffer), st = new Int32Array(8);
+      for (let i = 0; i < 16; i++) w[i] = dv.getInt32(4 * i);
+      compress256(IV256, w, st);
+      return st;
+    };
+    const inner = padState(ipad), outer = padState(opad);
+    const u1 = hmacSha256(password, concat(asBytes(salt), Uint8Array.of(0, 0, 0, 1)));
+    const u = new Int32Array(8), t = new Int32Array(8), tmp = new Int32Array(8), w = new Int32Array(64);
+    const udv = new DataView(u1.buffer);
+    for (let i = 0; i < 8; i++) { u[i] = udv.getInt32(4 * i); t[i] = u[i]; }
+    w[8] = 0x80000000 | 0;  // padding of a 32-byte message after the 64-byte pad block: total 96 bytes = 768 bits
+    w[15] = 768;
+    for (let n = 1; n < iterations; n++) {
+      w.set(u, 0);
+      compress256(inner, w, tmp);
+      w.set(tmp, 0);
+      compress256(outer, w, u);
+      for (let i = 0; i < 8; i++) t[i] ^= u[i];
+    }
+    ipad.fill(0); opad.fill(0); u.fill(0); tmp.fill(0); w.fill(0);
+    return wordsToBytes(t);
+  }
+
+  // ------------------------------------------------------------------ Ed25519 (RFC 8032 §5.1, pure, no prehash)
+  const P = 2n ** 255n - 19n;
+  const L = 2n ** 252n + 27742317777372353535851937790883648493n;
+  const mod = (a, m = P) => { const r = a % m; return r >= 0n ? r : r + m; };
+  function powMod(b, e, m = P) {
+    let r = 1n;
+    b = mod(b, m);
+    while (e > 0n) { if (e & 1n) r = (r * b) % m; b = (b * b) % m; e >>= 1n; }
+    return r;
+  }
+  const inv = (x) => powMod(x, P - 2n);
+  const D = mod(-121665n * inv(121666n));
+  const SQRT_M1 = powMod(2n, (P - 1n) / 4n);
+  function leToBig(b) {
+    let n = 0n;
+    for (let i = b.length - 1; i >= 0; i--) n = (n << 8n) | BigInt(b[i]);
+    return n;
+  }
+  function bigToLe32(n) {
+    const out = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) { out[i] = Number(n & 255n); n >>= 8n; }
+    return out;
+  }
+  // Points in extended coordinates [X, Y, Z, T] with x = X/Z, y = Y/Z, x*y = T/Z (RFC 8032 §5.1.4).
+  function pointAdd(p, q) {  // complete unified formula, also used for doubling
+    const a = mod((p[1] - p[0]) * (q[1] - q[0])), b = mod((p[1] + p[0]) * (q[1] + q[0]));
+    const c = mod(2n * D * p[3] * q[3]), d = mod(2n * p[2] * q[2]);
+    const e = b - a, f = d - c, g = d + c, h = b + a;
+    return [mod(e * f), mod(g * h), mod(f * g), mod(e * h)];
+  }
+  function pointMul(s, p) {
+    let q = [0n, 1n, 1n, 0n];
+    while (s > 0n) { if (s & 1n) q = pointAdd(q, p); p = pointAdd(p, p); s >>= 1n; }
+    return q;
+  }
+  function encodePoint(p) {
+    const zi = inv(p[2]), x = mod(p[0] * zi), y = mod(p[1] * zi);
+    const out = bigToLe32(y);
+    out[31] |= Number(x & 1n) << 7;
+    return out;
+  }
+  function decodePoint(b) {  // RFC 8032 §5.1.3; throws on any malformed / non-canonical encoding
+    if (!(b instanceof Uint8Array) || b.length !== 32) throw new Error("punto Ed25519: longitud inválida");
+    const sign = BigInt(b[31] >> 7), yb = b.slice();
+    yb[31] &= 0x7f;
+    const y = leToBig(yb);
+    if (y >= P) throw new Error("punto Ed25519 no canónico");
+    const y2 = mod(y * y), u = mod(y2 - 1n), v = mod(D * y2 + 1n);
+    const x2 = mod(u * inv(v));
+    let x = powMod(x2, (P + 3n) / 8n);
+    if (mod(x * x - x2) !== 0n) x = mod(x * SQRT_M1);
+    if (mod(x * x - x2) !== 0n) throw new Error("punto Ed25519 fuera de la curva");
+    if (x === 0n && sign === 1n) throw new Error("punto Ed25519 no canónico");
+    if ((x & 1n) !== sign) x = P - x;
+    return [x, y, 1n, mod(x * y)];
+  }
+  const BASE = decodePoint(bigToLe32(mod(4n * inv(5n))));  // B = (x, 4/5) with even x
+  function expandSeed(seed) {
+    if (!(seed instanceof Uint8Array) || seed.length !== 32) throw new Error("la semilla debe tener 32 bytes");
+    const h = sha512(seed), a = h.slice(0, 32);
+    a[0] &= 248; a[31] &= 127; a[31] |= 64;
+    return { a: leToBig(a), prefix: h.slice(32) };
+  }
+  const generateSeed = () => randomBytes(32);
+  const publicKeyFromSeed = (seed) => encodePoint(pointMul(expandSeed(seed).a, BASE));
+  function sign(seed, msg) {
+    msg = asBytes(msg);
+    const { a, prefix } = expandSeed(seed), pub = encodePoint(pointMul(a, BASE));
+    const r = leToBig(sha512(concat(prefix, msg))) % L;
+    const R = encodePoint(pointMul(r, BASE));
+    const k = leToBig(sha512(concat(R, pub, msg))) % L;
+    return concat(R, bigToLe32((r + k * a) % L));
+  }
+  function verify(pub, msg, sig) {  // cofactorless check [S]B == R + [k]A; any malformed input => false
+    try {
+      msg = asBytes(msg);
+      if (!(sig instanceof Uint8Array) || sig.length !== 64) return false;
+      const A = decodePoint(pub), R = decodePoint(sig.slice(0, 32)), S = leToBig(sig.slice(32));
+      if (S >= L) return false;
+      const k = leToBig(sha512(concat(sig.slice(0, 32), pub, msg))) % L;
+      return toHex(encodePoint(pointMul(S, BASE))) === toHex(encodePoint(pointAdd(R, pointMul(k, A))));
+    } catch (e) {
+      return false;
+    }
+  }
+  const keyId = (pub) => "ed25519-sha256:" + toHex(sha256(pub)).slice(0, 16);
+
+  // ------------------------------------------------------------------ NXKEY1 encrypted seed (101 bytes)
+  // 0x01 | iterations u32be | salt16 | nonce16 | ct32 | tag32 ; tag = HMAC(mac_key, "NXKEY1" || bytes[0..69)).
+  const KEY_PREFIX = "NXKEY1.", DEFAULT_ITERATIONS = 600000, MIN_ITERATIONS = 100000, MAX_ITERATIONS = 10000000;
+  function nxkeyMaterial(passphrase, salt, iterations, nonce) {
+    const master = pbkdf2Sha256(utf8(passphrase), salt, iterations);
+    const enc = hmacSha256(master, utf8("NXKEY1-enc")), mac = hmacSha256(master, utf8("NXKEY1-mac"));
+    const stream = hmacSha256(enc, concat(nonce, Uint8Array.of(0, 0, 0, 0)));
+    master.fill(0); enc.fill(0);
+    return { mac, stream };
+  }
+  function encryptSeed(seed, passphrase, iterations = DEFAULT_ITERATIONS, salt = undefined, nonce = undefined) {
+    if (!(seed instanceof Uint8Array) || seed.length !== 32) throw new Error("la semilla debe tener 32 bytes");
+    if (typeof passphrase !== "string" || [...passphrase].length < 12) {
+      throw new Error("La frase de paso debe tener al menos 12 caracteres.");
+    }
+    if (!Number.isInteger(iterations) || iterations < MIN_ITERATIONS || iterations > MAX_ITERATIONS) {
+      throw new Error("Número de iteraciones fuera de rango.");
+    }
+    salt = salt ?? randomBytes(16);
+    nonce = nonce ?? randomBytes(16);
+    if (salt.length !== 16 || nonce.length !== 16) throw new Error("sal y nonce deben tener 16 bytes");
+    const { mac, stream } = nxkeyMaterial(passphrase, salt, iterations, nonce);
+    const head = new Uint8Array(69);
+    head[0] = 1;
+    new DataView(head.buffer).setUint32(1, iterations);
+    head.set(salt, 5);
+    head.set(nonce, 21);
+    for (let i = 0; i < 32; i++) head[37 + i] = seed[i] ^ stream[i];
+    const tag = hmacSha256(mac, concat(utf8("NXKEY1"), head));
+    stream.fill(0); mac.fill(0);
+    return KEY_PREFIX + b64urlEncode(concat(head, tag));
+  }
+  function decryptSeed(blob, passphrase) {
+    const bad = () => new Error("Llave cifrada NXKEY1 inválida o incompleta.");
+    if (typeof blob !== "string") throw bad();
+    blob = blob.replace(/\s+/g, "");
+    if (!blob.startsWith(KEY_PREFIX)) throw bad();
+    let raw;
+    try { raw = b64urlDecode(blob.slice(KEY_PREFIX.length)); } catch (e) { throw bad(); }
+    if (raw.length !== 101 || raw[0] !== 1) throw bad();
+    const iterations = new DataView(raw.buffer).getUint32(1);
+    if (iterations < MIN_ITERATIONS || iterations > MAX_ITERATIONS) throw bad();
+    if (typeof passphrase !== "string" || passphrase.length === 0) throw new Error("Introduce la frase de paso.");
+    const { mac, stream } = nxkeyMaterial(passphrase, raw.slice(5, 21), iterations, raw.slice(21, 37));
+    const tag = hmacSha256(mac, concat(utf8("NXKEY1"), raw.slice(0, 69)));
+    let diff = 0;
+    for (let i = 0; i < 32; i++) diff |= tag[i] ^ raw[69 + i];  // compare all bytes before deciding
+    if (diff !== 0) throw new Error("Frase de paso incorrecta (o llave cifrada dañada).");
+    const seed = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) seed[i] = raw[37 + i] ^ stream[i];
+    stream.fill(0); mac.fill(0);
+    return seed;
+  }
+
+  // ------------------------------------------------------------------ v3 wire formats (see phone_approval.py)
+  const CH_PREFIX = "NXCH1.", SIG_PREFIX = "NXSIG3.", MAX_TOKEN_CHARS = 1024;
+  const ACTION_KIND_LABELS = Object.freeze({  // M-12/D-C41: abort is unsigned, never a challenge
+    VENTURE_GATE: "Aprobar gate de venture (presupuesto)",
+  });
+  const UTC_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+  const CH_FIELDS = {  // same patterns as PhoneApprovalChallenge
+    action_id: /^act_[0-9a-f]{16}$/,
+    action_kind: /^VENTURE_GATE$/,  // D-C34: no VAULT_UNSEAL; M-12: no VENTURE_ABORT
+    content_sha256: /^[0-9a-f]{64}$/,
+    expires_at_utc: UTC_RE,
+    nonce: /^[0-9a-f]{32}$/,
+    venture_id: /^proj_[a-f0-9]{12}$/,
+  };
+  const SIG_FIELDS = {  // same patterns as PhoneSignatureToken
+    action_id: /^act_[0-9a-f]{16}$/,
+    amount_usd: /^\d{1,3}\.\d{2}$/,
+    decision: /^(?:APPROVE|VETO)$/,
+    signature_hex: /^[0-9a-f]{128}$/,
+  };
+  // Python json.dumps(sort_keys=True, separators=(",", ":")) for flat objects of ASCII strings / integers.
+  function canonicalJson(obj) {
+    const s = "{" + Object.keys(obj).sort().map((k) => JSON.stringify(k) + ":" + JSON.stringify(obj[k])).join(",") + "}";
+    if (!/^[\x20-\x7e]*$/.test(s)) throw new Error("JSON canónico no ASCII");
+    return s;
+  }
+  function checkFields(obj, fields, extra) {
+    if (obj === null || typeof obj !== "object" || Array.isArray(obj)) throw new Error("no es un objeto");
+    const want = Object.keys(fields).concat(Object.keys(extra)).sort();
+    if (Object.keys(obj).sort().join(",") !== want.join(",")) throw new Error("campos inesperados");
+    for (const [k, re] of Object.entries(fields)) if (typeof obj[k] !== "string" || !re.test(obj[k])) throw new Error(k);
+    for (const [k, v] of Object.entries(extra)) if (obj[k] !== v) throw new Error(k);
+    return Object.freeze({ ...obj });
+  }
+  const validateChallenge = (c) => checkFields(c, CH_FIELDS, { payload_version: 3 });
+  function decodeToken(token, prefix, fields, extra, label) {
+    if (typeof token !== "string") throw new Error(`Falta el ${label}.`);
+    token = token.replace(/\s+/g, "");
+    if (token.length > MAX_TOKEN_CHARS || !token.startsWith(prefix)) throw new Error(`El ${label} debe empezar por ${prefix}`);
+    const body = token.slice(prefix.length);
+    let obj;
+    try { obj = checkFields(JSON.parse(utf8Decode(b64urlDecode(body))), fields, extra); } catch (e) {
+      throw new Error(`${label} ${prefix} mal formado o manipulado.`);
+    }
+    if (b64urlEncode(utf8(canonicalJson(obj))) !== body) throw new Error(`${label} ${prefix} no canónico.`);
+    return obj;
+  }
+  const decodeChallenge = (t) => decodeToken(t, CH_PREFIX, CH_FIELDS, { payload_version: 3 }, "reto");
+  const decodeSignatureToken = (t) => decodeToken(t, SIG_PREFIX, SIG_FIELDS, {}, "token");
+  const asChallenge = (c) => (typeof c === "string" ? decodeChallenge(c) : validateChallenge(c));
+
+  // Amount: "12" | "12.5" | "12.50" | "12,50" -> "12.50"; integer cents only, never floats. VETO forces "0.00".
+  function parseAmount(input, decision) {
+    if (decision === "VETO") return "0.00";
+    if (decision !== "APPROVE") throw new Error("La decisión debe ser APPROVE o VETO.");
+    const m = /^(\d{1,3})(?:[.,](\d{1,2}))?$/.exec(String(input ?? "").trim());
+    if (!m) throw new Error("Importe inválido: número entre 0.00 y 100.00 con máximo 2 decimales.");
+    const cents = parseInt(m[1], 10) * 100 + parseInt((m[2] ?? "").padEnd(2, "0"), 10);
+    if (cents > 10000) throw new Error("El importe supera el máximo de 100.00 USD.");
+    return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;
+  }
+  function expiryMs(challenge) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$/.exec(asChallenge(challenge).expires_at_utc);
+    return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+  }
+  const isExpired = (challenge, nowMs = Date.now()) => nowMs >= expiryMs(challenge);
+  function canonicalPayload(challenge, decision, amount) {  // == CanonicalPhoneApprovalPayload.canonical_bytes()
+    const c = asChallenge(challenge);
+    const amount_usd = parseAmount(amount, decision);
+    return utf8(canonicalJson({ ...c, decision, amount_usd }));
+  }
+  function signatureToken(challenge, decision, amount, seed, nowMs = Date.now()) {
+    const c = asChallenge(challenge);
+    if (isExpired(c, nowMs)) throw new Error("El reto ha caducado según el reloj del teléfono: no se firma.");
+    const amount_usd = parseAmount(amount, decision);
+    const msg = canonicalPayload(c, decision, amount_usd);
+    const sig = sign(seed, msg);
+    if (!verify(publicKeyFromSeed(seed), msg, sig)) throw new Error("Autoverificación de la firma fallida: no se usa.");
+    return SIG_PREFIX + b64urlEncode(utf8(canonicalJson({ action_id: c.action_id, amount_usd, decision,
+      signature_hex: toHex(sig) })));
+  }
+  function telegramCommand(challenge, totp, sigToken) {
+    const c = asChallenge(challenge);
+    if (c.action_kind !== "VENTURE_GATE") throw new Error("Solo VENTURE_GATE se decide por Telegram; usa la Cabina.");
+    const t = decodeSignatureToken(sigToken);
+    if (t.action_id !== c.action_id) throw new Error("El token no corresponde a este reto.");
+    let code = String(totp ?? "").trim();
+    if (code === "") code = "<totp>";
+    else if (!/^\d{6}$/.test(code)) throw new Error("El código TOTP debe tener exactamente 6 dígitos.");
+    const token = SIG_PREFIX + b64urlEncode(utf8(canonicalJson(t)));
+    return `/${t.decision === "APPROVE" ? "approve" : "veto"} ${c.venture_id} ${code} ${token}`;
+  }
+  // M-10 / F0-S3B helpers (pure): `#ch=NXCH1...[&bot=<username>]` fragment (never sent over the network), the
+  // display-only check code (== phone_approval.check_code) and the Telegram reply links. Nothing here is verified by
+  // NEXORA: a wrong `bot` only changes where the CEO sends the command; the host accepts it only from the CEO chat.
+  const BOT_RE = /^[A-Za-z0-9_]{5,32}$/, B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  function checkCode(token) {  // base32(sha256(utf8(token)))[:8] as XXXX-XXXX: 40 bits, exact in a double
+    const h = sha256(String(token));
+    let n = 0, s = "";
+    for (let i = 0; i < 5; i++) n = n * 256 + h[i];
+    for (let i = 7; i >= 0; i--) s += B32[Math.floor(n / 32 ** i) % 32];
+    return s.slice(0, 4) + "-" + s.slice(4);
+  }
+  function fragmentParams(hash) {  // unknown parameters and an invalid `bot` are ignored, never fatal for `ch`
+    let ch = null, bot = null, seenCh = false;
+    const h = String(hash ?? "");
+    for (const part of h.startsWith("#") ? h.slice(1).split("&") : []) {
+      const i = part.indexOf("="), k = i < 0 ? part : part.slice(0, i), v = i < 0 ? "" : part.slice(i + 1);
+      if (k === "ch" && !seenCh) { seenCh = true; if (/^NXCH1\.[A-Za-z0-9_-]+$/.test(v)) ch = v; }
+      else if (k === "bot" && bot === null && BOT_RE.test(v)) bot = v;
+    }
+    if (ch !== null) decodeChallenge(ch);  // throws on a malformed or tampered challenge
+    return { ch, bot };
+  }
+  const challengeFromHash = (hash) => fragmentParams(hash).ch;
+  const telegramShareUrl = (command) => "tg://msg?text=" + encodeURIComponent(command);
+  const replyUrl = (command, bot) => (typeof bot === "string" && BOT_RE.test(bot)
+    ? "https://t.me/" + bot + "?text=" + encodeURIComponent(command) : telegramShareUrl(command));
+
+  return Object.freeze({
+    utf8, toHex, fromHex, b64urlEncode, b64urlDecode, sha256, sha512, hmacSha256, pbkdf2Sha256,
+    generateSeed, publicKeyFromSeed, keyId, sign, verify, encryptSeed, decryptSeed,
+    decodeChallenge, decodeSignatureToken, parseAmount, expiryMs, isExpired, canonicalPayload,
+    signatureToken, telegramCommand, challengeFromHash, telegramShareUrl, checkCode, fragmentParams, replyUrl,
+    ACTION_KIND_LABELS, DEFAULT_ITERATIONS, MIN_ITERATIONS, MAX_ITERATIONS,
+  });
+})();
+
+// ==================================================================== UI wiring (browser only)
+if (typeof document !== "undefined") {
+  const $ = (id) => document.getElementById(id);
+  let seed = null;        // unlocked Ed25519 seed: lives ONLY in this variable, never stored
+  let challenge = null;   // last inspected challenge
+  let bot = null;         // F0-S3B: bot @username from `#...&bot=` (reply goes straight to its chat)
+
+  function say(el, text, kind = "") {
+    $(el).textContent = text;
+    $(el).className = "msg" + (kind ? " " + kind : "");
+  }
+  function later(fn) { setTimeout(fn, 60); }  // let Safari repaint "Procesando…" before heavy PBKDF2 work
+
+  function setUnlocked(newSeed) {
+    if (seed) seed.fill(0);
+    seed = newSeed;
+    const on = seed !== null;
+    $("key-state").textContent = on ? "DESBLOQUEADA" : "BLOQUEADA";
+    $("key-state").className = "state " + (on ? "on" : "off");
+    $("key-id-view").textContent = on ? NXCORE.keyId(NXCORE.publicKeyFromSeed(seed)) : "";
+    $("btn-lock").hidden = !on;
+  }
+  function lock() {
+    setUnlocked(null);
+    for (const id of ["unlock-pass", "new-pass", "new-pass2", "out-tg", "out-sig"]) $(id).value = "";
+    $("sign-out").hidden = true;
+    say("unlock-msg", "Llave bloqueada y borrada de la memoria.", "ok");
+  }
+  $("btn-lock").addEventListener("click", lock);
+  window.addEventListener("pagehide", () => setUnlocked(null));
+
+  $("form-unlock").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const blob = $("unlock-blob").value, pass = $("unlock-pass").value;
+    say("unlock-msg", "Procesando… (unos segundos)", "warn");
+    later(() => {
+      try {
+        setUnlocked(NXCORE.decryptSeed(blob, pass));
+        $("unlock-pass").value = "";
+        say("unlock-msg", "Llave desbloqueada en memoria.", "ok");
+      } catch (e) {
+        say("unlock-msg", e.message, "bad");
+      }
+    });
+  });
+
+  function addRow(tbody, name, value) {
+    const tr = document.createElement("tr"), th = document.createElement("th"), td = document.createElement("td");
+    th.textContent = name;
+    td.textContent = value;
+    tr.append(th, td);
+    tbody.append(tr);
+  }
+  function decision() { return document.querySelector('input[name="decision"]:checked').value; }
+  function syncDecision() {
+    const veto = decision() === "VETO";
+    $("amount").disabled = veto;
+    if (veto) $("amount").value = "0.00";
+  }
+  for (const r of document.querySelectorAll('input[name="decision"]')) r.addEventListener("change", syncDecision);
+
+  function showExpiry() {
+    if (!challenge) return;
+    const left = Math.floor((NXCORE.expiryMs(challenge) - Date.now()) / 60000);
+    const local = new Date(NXCORE.expiryMs(challenge)).toLocaleString("es-ES");
+    if (NXCORE.isExpired(challenge)) say("ch-expiry", `CADUCADO (${local}). No se puede firmar.`, "bad");
+    else say("ch-expiry", `Caduca: ${local} (quedan ${left} min).`, left < 5 ? "warn" : "ok");
+  }
+  function inspect() {
+    $("sign-out").hidden = true;
+    say("sign-msg", "");
+    const tbody = $("ch-table");
+    tbody.replaceChildren();
+    try {
+      challenge = NXCORE.decodeChallenge($("ch-input").value);
+      $("ch-code").textContent = NXCORE.checkCode($("ch-input").value.replace(/\s+/g, ""));
+    } catch (e) {
+      challenge = null;
+      $("ch-view").hidden = true;
+      say("sign-msg", e.message, "bad");
+      return;
+    }
+    addRow(tbody, "venture_id", challenge.venture_id);
+    addRow(tbody, "Acción", `${NXCORE.ACTION_KIND_LABELS[challenge.action_kind]} (${challenge.action_kind})`);
+    addRow(tbody, "content_sha256", challenge.content_sha256);
+    addRow(tbody, "expires_at_utc", challenge.expires_at_utc);
+    addRow(tbody, "nonce", challenge.nonce);
+    addRow(tbody, "action_id", challenge.action_id);
+    $("ch-view").hidden = false;
+    syncDecision();
+    showExpiry();
+  }
+  $("btn-inspect").addEventListener("click", inspect);
+
+  $("btn-sign").addEventListener("click", () => {
+    $("sign-out").hidden = true;
+    if (!challenge) return say("sign-msg", "Inspecciona primero un reto NXCH1.", "bad");
+    if (!seed) return say("sign-msg", "Desbloquea primero la llave (paso 1).", "bad");
+    showExpiry();
+    try {
+      const dec = decision();
+      const amount = NXCORE.parseAmount($("amount").value, dec);
+      const token = NXCORE.signatureToken(challenge, dec, amount, seed);
+      const gate = challenge.action_kind === "VENTURE_GATE";
+      $("out-sig").value = token;
+      $("out-tg").value = gate ? NXCORE.telegramCommand(challenge, $("totp").value, token) : "";
+      $("tg-open").href = gate ? NXCORE.replyUrl($("out-tg").value, bot) : "#";
+      $("tg-open").textContent = bot ? `Responder a @${bot}` : "Responder en Telegram (1 toque)";
+      $("tg-pick").href = gate ? NXCORE.telegramShareUrl($("out-tg").value) : "#";
+      $("tg-pick").hidden = !(gate && bot);
+      $("tg-wrap").hidden = !gate;
+      $("tg-none").hidden = gate;
+      $("sign-out").hidden = false;
+      say("copy-msg", "");
+      say("sign-msg", `Firmado y autoverificado: ${dec === "APPROVE" ? "APROBAR" : "VETAR"} ${amount} USD.`, "ok");
+    } catch (e) {
+      say("sign-msg", e.message, "bad");
+    }
+  });
+
+  async function copyFrom(id, msgEl) {
+    const ta = $(id), text = ta.value;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return say(msgEl, "Copiado.", "ok");
+      }
+    } catch (e) { /* fall back below */ }
+    ta.readOnly = false;
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand("copy");
+    ta.readOnly = true;
+    ta.blur();
+    say(msgEl, ok ? "Copiado." : "No se pudo copiar: selecciona el texto y cópialo a mano.", ok ? "ok" : "bad");
+  }
+  $("copy-tg").addEventListener("click", () => copyFrom("out-tg", "copy-msg"));
+  $("tg-open").addEventListener("click", () => { copyFrom("out-tg", "copy-msg"); });  // copy too, then open the link
+  $("tg-pick").addEventListener("click", () => { copyFrom("out-tg", "copy-msg"); });
+
+  // Auto-load `#ch=NXCH1...[&bot=...]` from the URL fragment (never sent to any server: M-10 QR / F0-S3B button).
+  try {
+    const params = NXCORE.fragmentParams(location.hash);
+    bot = params.bot;
+    if (params.ch) {
+      $("ch-input").value = params.ch;
+      inspect();
+    }
+  } catch (e) {
+    say("sign-msg", e.message, "bad");
+  }
+  $("copy-sig").addEventListener("click", () => copyFrom("out-sig", "copy-msg"));
+  $("copy-blob").addEventListener("click", () => copyFrom("new-blob-copy", "new-copy-msg"));
+  $("copy-pub").addEventListener("click", () => copyFrom("new-enrol", "new-copy-msg"));
+
+  $("btn-generate").addEventListener("click", () => {
+    const p1 = $("new-pass").value, p2 = $("new-pass2").value;
+    if (p1 !== p2) return say("new-msg", "Las dos frases de paso no coinciden.", "bad");
+    if ([...p1].length < 12) return say("new-msg", "La frase de paso debe tener al menos 12 caracteres.", "bad");
+    say("new-msg", "Generando y cifrando… (unos segundos)", "warn");
+    later(() => {
+      try {
+        const fresh = NXCORE.generateSeed();
+        const blob = NXCORE.encryptSeed(fresh, p1);
+        const back = NXCORE.decryptSeed(blob, p1);  // self-check: the stored blob really opens with this phrase
+        if (NXCORE.toHex(back) !== NXCORE.toHex(fresh)) throw new Error("Autoverificación del cifrado fallida.");
+        back.fill(0);
+        const pub = NXCORE.publicKeyFromSeed(fresh);
+        $("new-blob").value = blob;
+        $("new-blob-copy").value = blob;
+        $("new-enrol").value = `public_key_hex=${NXCORE.toHex(pub)}\nkey_id=${NXCORE.keyId(pub)}`;
+        $("new-out").hidden = false;
+        $("btn-save").disabled = false;
+        setUnlocked(fresh);
+        say("new-msg", "Llave creada. Pulsa «Guardar en el Llavero» y guarda también la copia de seguridad.", "ok");
+      } catch (e) {
+        say("new-msg", e.message, "bad");
+      }
+    });
+  });
+  $("form-new").addEventListener("submit", (ev) => {
+    ev.preventDefault();  // no navigation; Safari offers to save username (NXKEY1 blob) + new-password
+    $("new-pass2").value = "";
+    say("new-msg", "Si Safari lo ofrece, acepta guardar la contraseña. Envía solo public_key_hex y key_id.", "ok");
+  });
+}
+</script>
+</body>
+</html>
